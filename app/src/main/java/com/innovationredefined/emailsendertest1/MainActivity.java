@@ -2,21 +2,33 @@ package com.innovationredefined.emailsendertest1;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.accounts.Account;
 import android.accounts.AccountManager;
+import android.accounts.AccountManagerCallback;
+import android.accounts.AccountManagerFuture;
+import android.accounts.AuthenticatorException;
+import android.accounts.OperationCanceledException;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.IOException;
+
 public class MainActivity extends AppCompatActivity {
 
-    Button button_ChooseAccount;
+    Button button_ChooseAccount, button_Authenticate;
     TextView textView_SelectedAccount;
     Context context;
     private final int ACCOUNT_PICKER_REQUEST_CODE = 1212;
+    private final String AUTH_TOKEN_TYPE = "oauth2:https://mail.google.com/";
+    String selectedAccountName;
+    Account selectedAccount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,25 +38,82 @@ public class MainActivity extends AppCompatActivity {
         context = this;
 
         button_ChooseAccount = findViewById(R.id.button_choose_account);
+        button_Authenticate = findViewById(R.id.button_authenticate);
         textView_SelectedAccount = findViewById(R.id.textView_selected_account);
 
         button_ChooseAccount.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                //Start account chooser flow
                 Intent intent = AccountManager.newChooseAccountIntent(null, null, new String[]{"com.google"},
                         false, null, null, null, null);
                 startActivityForResult(intent, ACCOUNT_PICKER_REQUEST_CODE);
             }
         });
+
+        //Start authentication flow
+        button_Authenticate.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!TextUtils.isEmpty(selectedAccountName)) {
+                    AccountManager accountManager = AccountManager.get(context);
+                    Account[] accounts = accountManager.getAccountsByType("com.google");
+
+                    for (Account account : accounts
+                    ) {
+                        if (account.name.equals(selectedAccountName)) {
+                            selectedAccount = account;
+                            break;
+                        }
+                    }
+
+                    if (selectedAccount != null) {
+                        Bundle options = new Bundle();
+                        accountManager.getAuthToken(
+                                selectedAccount,               // Account retrieved using getAccountsByType()
+                                AUTH_TOKEN_TYPE,                // Auth scope
+                                options,                        // Authenticator-specific options
+                                MainActivity.this,                           // Your activity
+                                new AccountManagerCallback<Bundle>() {
+                                    @Override
+                                    public void run(AccountManagerFuture<Bundle> result) {
+                                        try {
+                                            // Get the result of the operation from the AccountManagerFuture.
+                                            Bundle bundle = result.getResult();
+
+                                            // The token is a named value in the bundle. The name of the value
+                                            // is stored in the constant AccountManager.KEY_AUTHTOKEN.
+                                            String token = bundle.getString(AccountManager.KEY_AUTHTOKEN);
+
+                                        } catch (OperationCanceledException e) {
+                                            Toast.makeText(context, e.getMessage(), Toast.LENGTH_SHORT).show();
+                                        } catch (IOException e) {
+                                            Toast.makeText(context, e.getMessage(), Toast.LENGTH_SHORT).show();
+                                        } catch (AuthenticatorException e) {
+                                            Toast.makeText(context, e.getMessage(), Toast.LENGTH_SHORT).show();
+                                        }
+                                    }
+                                }
+                                ,          // Callback called when a token is successfully acquired
+                                null);    // Callback called if an error occurs
+
+                    }
+
+                }
+            }
+        });
     }
 
+
+    //Account chosen
     protected void onActivityResult(final int requestCode, final int resultCode,
                                     final Intent data) {
         if (requestCode == ACCOUNT_PICKER_REQUEST_CODE && resultCode == RESULT_OK) {
             String accountName = data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME);
-            Toast.makeText(context, accountName, Toast.LENGTH_SHORT).show();
+            selectedAccountName = accountName;
             textView_SelectedAccount.setText(accountName);
-
         }
     }
+
+
 }
