@@ -13,12 +13,22 @@ import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.creativityapps.gmailbackgroundlibrary.BackgroundMail;
+import com.squareup.okhttp.Callback;
+import com.squareup.okhttp.FormEncodingBuilder;
+import com.squareup.okhttp.OkHttpClient;
+import com.squareup.okhttp.Request;
+import com.squareup.okhttp.RequestBody;
+import com.squareup.okhttp.Response;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.Properties;
@@ -122,9 +132,11 @@ public class MainActivity extends AppCompatActivity {
         button_SendMail.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (!TextUtils.isEmpty(selectedAccountName) && !TextUtils.isEmpty(oauthTOken))
-                    sendTestEmail();
+                if (!TextUtils.isEmpty(selectedAccountName) && !TextUtils.isEmpty(oauthTOken)) {
+                    getActualKey();
+                    //sendTestEmail();
                     //new SendEmailWithJavaMail().execute("");
+                }
             }
         });
     }
@@ -194,7 +206,7 @@ public class MainActivity extends AppCompatActivity {
                 message.setRecipient(Message.RecipientType.TO, toAddress);
 
                 Transport transport = session.getTransport("smtp");
-                transport.connect("smtp.gmail.com", selectedAccountName,oauthTOken);
+                transport.connect("smtp.gmail.com", selectedAccountName, oauthTOken);
                 transport.sendMessage(message, message.getAllRecipients());
                 transport.close();
             } catch (MessagingException e) {
@@ -204,5 +216,35 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+
+    private void getActualKey() {
+        OkHttpClient client = new OkHttpClient();
+        RequestBody requestBody = new FormEncodingBuilder()
+                .add("grant_type", "authorization_code")
+                .add("client_id", "547901543787-dnlh0irmspv599uh6phdn7gor5diuqgo.apps.googleusercontent.com")
+                .add("code", oauthTOken)
+                .build();
+        final Request request = new Request.Builder()
+                .url("https://www.googleapis.com/oauth2/v4/token")
+                .post(requestBody)
+                .build();
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(final Request request, final IOException e) {
+                Log.e("TESTTT", e.toString());
+            }
+
+            @Override
+            public void onResponse(Response response) throws IOException {
+                try {
+                    JSONObject jsonObject = new JSONObject(response.body().string());
+                    final String message = jsonObject.toString(5);
+                    Log.i("TESTTT", message);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
 
 }
